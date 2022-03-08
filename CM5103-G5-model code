@@ -1,0 +1,163 @@
+import numpy as np
+import scipy as sp
+from scipy import sparse
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from IPython.display import HTML
+import math
+import time
+# %matplotlib notebook
+
+L = 32.0  # the width and height of the domain.
+N = 1000  # the number of particles
+
+r0 = 1.0  # the radius
+deltat = 1.0  # the time interval
+factor = 0.4  # tunable to increase/decrease speed
+v0 = r0 / deltat * factor  # compute the constant speed
+Rcen = 2
+pi = math.pi
+OVERALL = 0
+# Init. of the particles
+pos = np.random.uniform(0, L, size=(N, 2))
+for t in range (0,N):
+    if ((L/2-Rcen) <= pos[t][1] <= (L/2+Rcen)):
+        pos[t][1] += np.random.uniform(0, (L-2*Rcen)/2)
+    if ((L/2-Rcen) <= pos[t][0] <= (L/2+Rcen)):
+        pos[t][0] += np.random.uniform(0, (L-Rcen)/2)
+    else:
+        continue
+# Their orientations
+# print(pos[1][1])
+orient = np.random.uniform(-np.pi, np.pi, size=N)
+
+# help(ax.quiver) can help
+fig, ax = plt.subplots(figsize=(6, 6))
+qv = ax.quiver(pos[:, 0], pos[:, 1],
+               np.cos(orient), np.sin(orient),
+               orient,
+               clim=[-np.pi, np.pi]
+               )
+r = 10
+squaremin = L - r
+squaremax = L + r
+def animate(i):
+    time0 = time.time()
+    N_over_scal = 0
+    time_overall = 0
+    ### Here is the code to update the position of
+    ### particles. Your job is to change the following line
+    ### to compute the update with respect to Vicksec model.
+    ### You can define your own function(s) if you want.
+    ### You need to modify pos and orient.
+    k = 0 ### the number of the neighbours
+    lst2 = list() ### a list of neighbours' location in original list
+    for n in range(0,N): # find the neighbours and count Here's An important problem to be solved here is the
+        # calculation of the distance of the particle at the boundary (|x-L<r0|or |y-L<r0|)，The method used is to
+        # calculate the distance between each point twice and take the relatively smaller one.Logically satisfies
+        # the effect, but is a bit of a waste of performance
+        Distance = (pos[i][0] - pos[n][0])*(pos[i][0] - pos[n][0]) + (pos[i][1] - pos[n][1]) * (pos[i][1] - pos[n][1])
+        if pos[i][0] < r0:
+            oppx = L + pos[i][0]
+        if pos[i][0] > L-r0:
+            oppx = pos[i][0] - L
+        else:
+            oppx = pos[i][0]
+        if pos[i][1] < r0:
+            oppy = L + pos[i][1]
+        if pos[i][1] > L-r0:
+            oppy = pos[i][1] - L
+        else:
+            oppy = pos[i][1]
+        opptimizedD = (oppx - pos[n][0])*(oppx - pos[n][0]) + (oppy - pos[n][1]) * (oppy - pos[n][1])
+        Real_D = min(opptimizedD,Distance)
+        if Real_D <= r0*r0 :
+            lst2.append(n)
+            k = k + 1
+        else:
+            continue
+    sumcos = 0 ###initiate denominator
+    sumsin = 0 ###initiate numerator
+    for h in range(0,k): ### calculate all neighbours' orientations to decide the new direction
+        sumcos = sumcos + np.cos(orient[h])
+        sumsin = sumsin + np.sin(orient[h])
+    orient[i] = math.atan(sumsin/sumcos)+0.5*0.1 ### calculate the model,(weight η = 0.5,additive noise ξ = 0.1)
+
+    for s in range(0,N): ###change the position
+        Rmim = 0.7
+        Rmax = 1.5
+        if (14<pos[s][0]<(L/2)+Rcen) & (14<pos[s][1]<(L/2)+Rcen):
+            if (0 <= orient[s] <pi/2)&(pos[s][1] <= pos[s][0]):
+                orient[s] = orient[s] - pi / 2 * np.random.uniform(Rmim, Rmax)
+            if (0 <= orient[s] <pi/2)&(pos[s][1] > pos[s][0]):
+                orient[s] = orient[s] + pi / 2 * np.random.uniform(Rmim, Rmax)
+            if (pi/2 <= orient[s] <pi)&(pos[s][1] <= -1 * pos[s][0]+L):
+                orient[s] = orient[s] + pi / 2 * np.random.uniform(Rmim, Rmax)
+            if (pi/2 <= orient[s] <pi) & (pos[s][1] > -1 * pos[s][0] + L):
+                orient[s] = orient[s] - pi / 2 * np.random.uniform(Rmim, Rmax)
+            if (pi <= orient[s] <pi*1.5) & (pos[s][1] <= pos[s][0]):
+                orient[s] = orient[s] + pi / 2 * np.random.uniform(Rmim, Rmax)
+            if (pi <= orient[s] < pi * 1.5) & (pos[s][1] > pos[s][0]):
+                orient[s] = orient[s] - pi / 2 * np.random.uniform(Rmim, Rmax)
+            if (pi*1.5 <= orient[s] < pi * 2) & (pos[s][1] > -1 * pos[s][0] + L):
+                orient[s] = orient[s] + pi / 2 * np.random.uniform(Rmim, Rmax)
+            if (pi * 1.5 <= orient[s] < pi * 2) & (pos[s][1] <= -1 * pos[s][0] + L):
+                orient[s] = orient[s] - pi / 2 * np.random.uniform(Rmim, Rmax)
+            if orient[s] >= pi * 2:
+                orient[s] = orient[s]-pi * 2
+            if orient[s] < 0:
+                orient[s] = orient[s] + pi * 2
+            pos[s][0] += v0 * np.cos(orient[s])*np.random.uniform(2, 3)
+            pos[s][1] += v0 * np.sin(orient[s])*np.random.uniform(2, 3)
+        else:
+            pos[s][0] += v0 * np.cos(orient[s])
+            pos[s][1] += v0 * np.sin(orient[s])
+        if pos[s][0] <= 0: ### Position correction during position iteration to make sure all particules are in torus
+            pos[s][0] = pos[s][0] + L
+            N_over_scal = N_over_scal + 1
+        if pos[s][0] >= L:
+            pos[s][0] = pos[s][0] - L
+            N_over_scal = N_over_scal + 1
+        if pos[s][1] <= 0:
+            pos[s][1] = pos[s][1] + L
+            N_over_scal = N_over_scal + 1
+        if pos[s][1] >= L:
+            pos[s][1] = pos[s][1] - L
+            N_over_scal = N_over_scal + 1
+        else:
+            continue
+    time1 = time.time()
+    # print("通量为",(N_over_scal) / (time1 - time0)/1000,"个/ms",N_over_scal,"个","",time1 - time0,"s")
+
+
+    # for i in range(0,N):
+    #     pos[i, 0] = pos[i, 0] + v0 * np.sin(orient[lst2[i]])
+    #     pos[i, 1] = pos[i, 1] + v0 * np.cos(orient[lst2[i]])
+    ### end of the update
+    ### These last lines below is for animation purpose.
+    qv.set_offsets(pos)
+    cos, sin = np.cos(orient), np.sin(orient)
+    qv.set_offsets(pos)
+    qv.set_UVC(cos, sin, orient)
+    return qv,
+
+ani = FuncAnimation(fig, animate,
+                    frames=np.arange(1, 500),  # the frames
+                    interval=10,  # time between frames (ms)
+                    blit=False)
+# a = [14,14,14,14,14,14,14,14,14]
+# b = [14,14.5,15,15.5,16,16.5,17,17.5,18]
+# c =  [18,18,18,18,18,18,18,18,18]
+# p1 = plt.plot(a, b, color='black', linewidth=2)
+# p2 = plt.plot(b, a, color='black', linewidth=2)
+# p3 = plt.plot(c, b, color='black', linewidth=2)
+# p4 = plt.plot(b, c, color='black', linewidth=2)
+circle = plt.Circle((16, 16), Rcen, color='red', fill=False)
+plt.gcf().gca().add_artist(circle)
+# plt.legend(name, frameon=False, loc="center", prop=font1)
+plt.text(14.12,15.75, 'Generator',fontsize=7)
+
+plt.show()
+HTML(ani.to_html5_video())  # visualization for colab notebook
+
+
